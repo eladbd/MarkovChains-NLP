@@ -11,13 +11,13 @@ typedef struct WordStruct {
     char *word;
     struct WordProbability *prob_list;
     int numOfOccur;
-
+    int wordProbabilitySize;
     //... Add your own fields here
 } WordStruct;
 
 typedef struct WordProbability {
     struct WordStruct *word_struct_ptr;
-    int wordProbabilitySize;
+
     int probabilityCount;
     double percentage;
     //... Add your own fields here
@@ -35,7 +35,7 @@ typedef struct LinkList {
     int size;
 } LinkList;
 
-WordStruct *createWordStruct(char *word);
+void createWordStruct(char *word, WordStruct **pStruct);
 
 WordStruct *checkOccurrence(LinkList *pList, char *token);
 
@@ -117,7 +117,7 @@ WordStruct *get_next_random_word(WordStruct *word_struct_ptr) {
     double totalPercentage = 0;
     double randomNum = ((double )rand() / RAND_MAX) * 100; // check casting to double
     int index = 0;
-    for (int i = 0; i < word_struct_ptr->prob_list->wordProbabilitySize; i++) {
+    for (int i = 0; i < word_struct_ptr->wordProbabilitySize; i++) {
         totalPercentage += word_struct_ptr->prob_list[i].percentage;
         if (totalPercentage > randomNum) {
             index = i;
@@ -148,52 +148,51 @@ int add_word_to_probability_list(WordStruct *first_word, WordStruct *second_word
     if(second_word == NULL){ // first word with dot.
         first_word->prob_list = NULL;
     }
-    if (first_word->prob_list == NULL) { // first word to add
-        first_word->prob_list = (WordProbability *) malloc(sizeof(WordProbability ) + 1);
+    if (first_word->wordProbabilitySize == 0) { // first word to add
+        first_word->prob_list = (WordProbability *) malloc(sizeof(WordProbability ));
         first_word->prob_list[0].probabilityCount = 1;
         first_word->prob_list[0].word_struct_ptr = second_word;
-        first_word->prob_list->wordProbabilitySize = 1;
-        updatePrecentage(first_word->prob_list);
+        first_word->wordProbabilitySize = 1;
+//        updatePrecentage(first_word->prob_list);
         return 1;
     }
     return checkProbabilityList(first_word, second_word);
 }
 
-void updatePrecentage(WordProbability *pProbability) {
-    int totalOccurences = occurences(pProbability);
-    for (int i = 0; i < pProbability->wordProbabilitySize; ++i) {
-        pProbability[i].percentage = (double) pProbability[i].probabilityCount / totalOccurences * 100.0;
-    }
-}
+//void updatePrecentage(WordProbability *pProbability) {
+//    int totalOccurences = occurences(pProbability);
+//    for (int i = 0; i < pProbability->wordProbabilitySize; ++i) {
+//        pProbability[i].percentage = (double) pProbability[i].probabilityCount / totalOccurences * 100.0;
+//    }
+//}
 
-int occurences(WordProbability *pProbability) {
-    int sum = 0;
-    for (int i = 0; i < pProbability->wordProbabilitySize; i++) {
-        sum += pProbability[i].probabilityCount;
-    }
-    return sum;
-}
+//int occurences(WordProbability *pProbability) {
+//    int sum = 0;
+//    for (int i = 0; i < pProbability->wordProbabilitySize; i++) {
+//        sum += pProbability[i].probabilityCount;
+//    }
+//    return sum;
+//}
 
 int checkProbabilityList(WordStruct *pStruct, WordStruct *secondWord) {
-    int pSize = pStruct->prob_list->wordProbabilitySize;
+    int pSize = pStruct->wordProbabilitySize;
     int i = 0;
     for (; i < pSize; i++) {
         if (strcmp(pStruct->prob_list[i].word_struct_ptr->word, secondWord->word) == 0) {
             pStruct->prob_list[i].probabilityCount++;
-            updatePrecentage(pStruct->prob_list);
+//            updatePrecentage(pStruct->prob_list);
             return 0;
         }
     }
-    i++;
-    pStruct->prob_list = (WordProbability *) realloc(pStruct->prob_list, sizeof(WordProbability)*(i));
+    pStruct->prob_list = (WordProbability *) realloc(pStruct->prob_list, sizeof(WordProbability)*i);
     if (!pStruct->prob_list) {
         fprintf(stdout, "Allocation failure: couldn't allocate memory\n");
         exit(EXIT_FAILURE);
     }
     pStruct->prob_list[i].word_struct_ptr = secondWord;
     pStruct->prob_list[i].probabilityCount = 1;
-    pStruct->prob_list->wordProbabilitySize++;
-    updatePrecentage(pStruct->prob_list);
+    pStruct->wordProbabilitySize++;
+//    updatePrecentage(pStruct->prob_list);
     return 1;
 }
 
@@ -212,29 +211,29 @@ void fill_dictionary(FILE *fp, int words_to_read, LinkList *dictionary) {
     char *line = NULL;
     ssize_t lineSize = 0;
     size_t nread;
-    char *space = " ";
+//    char *space = " ";
     WordStruct *curr;
     WordStruct *prev;
     while ((nread = getline(&line, &lineSize, fp)) != -1) {
         char *token;
-        token = strtok(line, space);
+        token = strtok(line, " ");
         WordStruct *wordStruct = NULL;
-        if(dictionary == NULL){
-            wordStruct = createWordStruct(token);
-            token = strtok(NULL,space);
-        }
+//        if(dictionary == NULL){
+//            wordStruct = createWordStruct(token);
+//            token = strtok(NULL,space);
+//        }
         while (token != NULL) {
             if ((wordStruct = checkOccurrence(dictionary, token)) == NULL) { // found match in linked list
-                wordStruct = createWordStruct(token);
+                createWordStruct(token, &wordStruct);
                 add(dictionary, wordStruct);
             }
             prev = wordStruct;
-            token = strtok(NULL, space);
+            token = strtok(NULL, " ");
             // second word and on.
             while (token != NULL) {
                 WordStruct *newWS = NULL;
                 if ((newWS = checkOccurrence(dictionary, token)) == NULL) { // found match
-                    newWS = createWordStruct(token);
+                    createWordStruct(token, &newWS);
                     add(dictionary,newWS);
                 }
                 curr = newWS;
@@ -244,14 +243,14 @@ void fill_dictionary(FILE *fp, int words_to_read, LinkList *dictionary) {
                     prev = curr;
                     curr = NULL;
                     add_word_to_probability_list(prev,curr);
-                    token = strtok(NULL,space);
+                    token = strtok(NULL," ");
                     break;
                 }
                 // stopped here
 //                wordStruct = createWordStruct(token);
 //                add(dictionary,wordStruct);
                 prev = curr;
-                token = strtok(NULL, space);
+                token = strtok(NULL, " ");
             }
         }
         free(line);
@@ -288,8 +287,11 @@ int countFileWords(FILE *file) {
 }
 
 WordStruct *checkOccurrence(LinkList *pList, char *token) { // check if the given word is in the link list already return -1 if false and 1 if true
+    if(pList->first == NULL){
+        return NULL;
+    }
     Node *tempNode = pList->first;
-    while (tempNode != NULL) {
+    for (int i = 0; i < pList->size; i++) {
         if (strcmp(token, tempNode->data->word) == 0) {
             tempNode->data->numOfOccur++;
             return tempNode->data;
@@ -299,13 +301,14 @@ WordStruct *checkOccurrence(LinkList *pList, char *token) { // check if the give
     return NULL;
 }
 
-WordStruct *createWordStruct(char *word) {
-    WordStruct * wordStruct = (WordStruct *) malloc(sizeof(WordStruct) + 1);
-    wordStruct->prob_list = NULL;
-    wordStruct->word = (char *) malloc(strlen(word) + 1); // problem need to solve
-    wordStruct->numOfOccur = 1;
-    strncpy(wordStruct->word, word, strlen(word));
-    return wordStruct;
+void createWordStruct(char *word, WordStruct **pStruct) {
+//    WordStruct *wordStruct = (WordStruct *) malloc(sizeof(WordStruct));
+    *pStruct = (WordStruct*) malloc(sizeof(WordStruct));
+    (*pStruct)->prob_list = NULL;
+    int x  = (strlen(word) + 1) * sizeof(char);
+    (*pStruct)->word = (char *) malloc(x); // problem need to solve
+    (*pStruct)->numOfOccur = 1;
+    strncpy((*pStruct)->word, word, strlen(word));
 }
 
 int main(int argc, char *argv[]) {
