@@ -184,7 +184,8 @@ int checkProbabilityList(WordStruct *pStruct, WordStruct *secondWord) {
             return 0;
         }
     }
-    pStruct->prob_list = (WordProbability *) realloc(pStruct->prob_list, sizeof(WordProbability )*i);
+    i++;
+    pStruct->prob_list = (WordProbability *) realloc(pStruct->prob_list, sizeof(WordProbability)*(i));
     if (!pStruct->prob_list) {
         fprintf(stdout, "Allocation failure: couldn't allocate memory\n");
         exit(EXIT_FAILURE);
@@ -299,9 +300,9 @@ WordStruct *checkOccurrence(LinkList *pList, char *token) { // check if the give
 }
 
 WordStruct *createWordStruct(char *word) {
-    WordStruct * wordStruct = (WordStruct *) malloc(sizeof(WordStruct ));
+    WordStruct * wordStruct = (WordStruct *) malloc(sizeof(WordStruct) + 1);
     wordStruct->prob_list = NULL;
-    wordStruct->word = (char *) malloc(strlen(word) + 1);
+    wordStruct->word = (char *) malloc(strlen(word) + 1); // problem need to solve
     wordStruct->numOfOccur = 1;
     strncpy(wordStruct->word, word, strlen(word));
     return wordStruct;
@@ -330,7 +331,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    LinkList *linkList = malloc(sizeof (LinkList));
+    LinkList *linkList = (LinkList *)malloc(sizeof (LinkList));
 
     fill_dictionary(tweetsFile, wordsToRead,linkList);
     printLinkedList(linkList);
