@@ -6,7 +6,7 @@
 #define MAX_WORDS_IN_SENTENCE_GENERATION 20
 #define MAX_WORD_LENGTH 100
 #define MAX_SENTENCE_LENGTH 1000
-
+int NUM_OF_WORDS = 0;
 typedef struct WordStruct {
     char *word;
     struct WordProbability *prob_list;
@@ -93,8 +93,6 @@ WordStruct *get_first_random_word(LinkList *dictionary) {
     int i = 0;
     Node *temp = dictionary->first;
     while (i != randomNum) {
-        temp = temp->next;
-        i++;
         if (i == randomNum) {
             if (strchr(temp->data->word, '.') != NULL) {
                 i = 0;
@@ -103,6 +101,8 @@ WordStruct *get_first_random_word(LinkList *dictionary) {
                 break; // found
             }
         }
+        temp = temp->next;
+        i++;
     }
     return temp->data;
 }
@@ -135,7 +135,14 @@ WordStruct *get_next_random_word(WordStruct *word_struct_ptr) {
  */
 int generate_sentence(LinkList *dictionary) {
     WordStruct *wordStruct = get_first_random_word(dictionary);
-
+    int countWords = 1;
+    printf("%s", wordStruct->word);
+    while (countWords < MAX_WORDS_IN_SENTENCE_GENERATION && strchr(wordStruct->word, '.') == NULL) {
+        wordStruct = get_next_random_word(wordStruct);
+        printf(" %s", wordStruct->word);
+        countWords++;
+    }
+    return countWords;
 }
 
 /**
@@ -216,7 +223,6 @@ void fill_dictionary(FILE *fp, int words_to_read, LinkList *dictionary) {
     char *line = NULL;
     ssize_t lineSize = 0;
     size_t nread;
-//    char *space = " ";
     WordStruct *curr = NULL;
     WordStruct *prev = NULL;
     char *token;
@@ -225,12 +231,8 @@ void fill_dictionary(FILE *fp, int words_to_read, LinkList *dictionary) {
         int endOfLine = 0;
         token = strtok(line, " ");
         WordStruct *wordStruct = NULL;
-        strcpy(temp, token);
-//        if ((wordStruct = checkOccurrence(dictionary, temp)) == NULL) { // didnt found match in linked list
-//            createWordStruct(temp, &wordStruct);
-//            add(dictionary, wordStruct);
-//        }
         while (token != NULL) {
+            strcpy(temp, token);
             if (temp[strlen(temp) - 1] == '\n') {
                 endOfLine = 1;
                 temp[strlen(temp) - 1] = '\0';
@@ -256,10 +258,8 @@ void fill_dictionary(FILE *fp, int words_to_read, LinkList *dictionary) {
                 curr = newWS;
                 add_word_to_probability_list(prev, curr);
                 if (strchr(temp, '.') != NULL) {
-                    // check '/n'
                     prev = curr;
-                    curr = NULL;
-                    add_word_to_probability_list(prev, curr);
+                    add_word_to_probability_list(prev, NULL);
                     if (endOfLine == 0) {
                         token = strtok(NULL, " ");
                     } else {
@@ -285,6 +285,28 @@ void fill_dictionary(FILE *fp, int words_to_read, LinkList *dictionary) {
  * @param dictionary Dictionary to free
  */
 void free_dictionary(LinkList *dictionary) {
+    Node *node = dictionary->first;
+    for (int i = 0; i < dictionary->size; i++) {
+        free(node->data->prob_list);
+        node->data->prob_list = NULL;
+        node = node->next;
+    }
+    node = dictionary->first;
+    for (int i = 0; i < dictionary->size; i++) {
+        free(node->data->word);
+        node->data->word = NULL;
+        free(node->data);
+        node->data = NULL;
+        node = node->next;
+    }
+    node = dictionary->first;
+    for (int i = 0; i < dictionary->size; i++) {
+        Node *temp = node->next;
+        free(node);
+        node = NULL;
+        node = temp;
+    }
+    free(dictionary);
 }
 
 /**
@@ -295,12 +317,19 @@ void free_dictionary(LinkList *dictionary) {
  *             4) Optional - Number of words to read
  */
 int countFileWords(FILE *file) {
-    char c;
+    ssize_t lineSize = 0;
+    size_t nread;
     int words = 0;
-    while ((c = fgetc(file)) != EOF) {
-        if (c == ' ' || c == '\t' || c == '\n' || c == '\0') {
+    char *line;
+    char *token;
+    while ((nread = getline(&line, &lineSize, file)) != -1) {
+        token = strtok(line," ");
+        while (token != NULL){
             words++;
+            token = strtok(NULL," ");
         }
+        free(line);
+        line = NULL;
     }
     return words;
 }
@@ -312,6 +341,7 @@ WordStruct *checkOccurrence(LinkList *pList, char *token) { // check if the give
     if (strchr(token, '\n') != NULL) {
         token[strcspn(token, "\n")] = '\0';
     }
+    NUM_OF_WORDS += 1;
     Node *tempNode = pList->first;
     for (int i = 0; i < pList->size; i++) {
         if (strcmp(tempNode->data->word, token) == 0) {
@@ -359,9 +389,15 @@ int main(int argc, char *argv[]) {
     }
 
     LinkList *linkList = (LinkList *) malloc(sizeof(LinkList));
-
     fill_dictionary(tweetsFile, wordsToRead, linkList);
+    rewind(tweetsFile);
+    int x = countFileWords(tweetsFile);
+    printf("Num of words: %d\n", x);
+
+    printf("Num of words MAIN: %d\n", NUM_OF_WORDS);
+//    generate_sentence(linkList);
     printLinkedList(linkList);
+//    free_dictionary(linkList);
 
     return 0;
 //    FILE *fp = fopen(argv[1], "r");
