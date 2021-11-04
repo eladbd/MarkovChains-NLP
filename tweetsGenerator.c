@@ -1,7 +1,8 @@
+#define  _POSIX_C_SOURCE 200809L
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 
 #define MAX_WORDS_IN_SENTENCE_GENERATION 20
 #define MAX_WORD_LENGTH 100
@@ -114,7 +115,7 @@ WordStruct *get_first_random_word(LinkList *dictionary) {
  */
 WordStruct *get_next_random_word(WordStruct *word_struct_ptr) {
     double totalPercentage = 0;
-    double randomNum = ((double) rand() / RAND_MAX) * 100; // check casting to double
+    double randomNum = ( rand() / (double)RAND_MAX) * 100.0; // check casting to double
     int index = 0;
     for (int i = 0; i < word_struct_ptr->wordProbabilitySize; i++) {
         totalPercentage += word_struct_ptr->prob_list[i].percentage;
@@ -156,6 +157,8 @@ int generate_sentence(LinkList *dictionary) {
 int add_word_to_probability_list(WordStruct *first_word, WordStruct *second_word) {
     if (second_word == NULL) { // first word with dot.
         first_word->prob_list = NULL;
+        first_word->wordProbabilitySize = 0;
+        return 1;
     }
     if (first_word->wordProbabilitySize == 0) { // first word to add
         first_word->prob_list = (WordProbability *) malloc(sizeof(WordProbability));
@@ -165,6 +168,7 @@ int add_word_to_probability_list(WordStruct *first_word, WordStruct *second_word
         }
         first_word->prob_list[0].probabilityCount = 1;
         first_word->prob_list[0].word_struct_ptr = second_word;
+        first_word->prob_list[0].percentage = 100.0;
         first_word->wordProbabilitySize = 1;
         updatePrecentage(first_word);
         return 1;
@@ -175,7 +179,7 @@ int add_word_to_probability_list(WordStruct *first_word, WordStruct *second_word
 void updatePrecentage(WordStruct *pStruct) {
     int totalOccurences = occurences(pStruct);
     for (int i = 0; i < pStruct->wordProbabilitySize; i++) {
-        pStruct->prob_list[i].percentage = (double) pStruct->prob_list[i].probabilityCount / totalOccurences * 100.0;
+        pStruct->prob_list[i].percentage = ((double) pStruct->prob_list[i].probabilityCount / totalOccurences) * 100.0;
     }
 }
 
@@ -208,7 +212,7 @@ int checkProbabilityList(WordStruct *pStruct, WordStruct *secondWord) {
     pStruct->prob_list[i].word_struct_ptr = secondWord;
     pStruct->prob_list[i].probabilityCount = 1;
     pStruct->wordProbabilitySize++;
-//    updatePrecentage(pStruct->prob_list);
+    updatePrecentage(pStruct);
     return 1;
 }
 
@@ -231,7 +235,7 @@ void fill_dictionary(FILE *fp, int words_to_read, LinkList *dictionary) {
     WordStruct *prev = NULL;
     char *token;
     char temp[MAX_WORD_LENGTH + 1];
-    while ((int)(nread = getline(&line, &lineSize, fp)) != -1) {
+    while ((int) (nread = getline(&line, &lineSize, fp)) != -1) {
         int endOfLine = 0;
         token = strtok(line, " ");
         WordStruct *wordStruct = NULL;
@@ -328,7 +332,7 @@ int countFileWords(FILE *file) {
     int words = 0;
     char *line = NULL;
     char *token = NULL;
-    while ((int)(nread = getline(&line, &lineSize, file)) != -1) {
+    while ((int) (nread = getline(&line, &lineSize, file)) != -1) {
         token = strtok(line, " ");
         while (token != NULL) {
             words++;
@@ -402,10 +406,9 @@ int main(int argc, char *argv[]) {
         int wordsCount = countFileWords(tweetsFile);
         if (strtol(argv[4], &p, 10) > wordsCount) {
             wordsToRead = wordsCount;
-        } else if(strtol(argv[4], &p, 10) == -1){
+        } else if (strtol(argv[4], &p, 10) == -1) {
             wordsToRead = wordsCount;
-        }
-        else{
+        } else {
             wordsToRead = strtol(argv[4], &p, 10);
         }
     }
@@ -426,7 +429,7 @@ int main(int argc, char *argv[]) {
         printf("Tweet %d: ", i);
         generate_sentence(linkList);
     }
-//    printLinkedList(linkList);
+    printLinkedList(linkList);
     free_dictionary(linkList);
     fclose(tweetsFile);
 
@@ -476,9 +479,16 @@ int main(int argc, char *argv[]) {
 
 void printLinkedList(LinkList *list) {
     int i = 0;
+    double sum  = 0;
     Node *tempNode = list->first;
     while (tempNode != NULL) {
         printf("%d : %s : occur: %d\n", i, tempNode->data->word, tempNode->data->numOfOccur);
+        for (int j = 0; j < tempNode->data->wordProbabilitySize; j++) {
+            printf("word: %s percentage : %f\n",tempNode->data->prob_list[j].word_struct_ptr->word,tempNode->data->prob_list[j].percentage);
+            sum += tempNode->data->prob_list[j].percentage;
+        }
+        printf("this is precentage : %f\n",sum);
+        sum = 0;
         i++;
         tempNode = tempNode->next;
     }
