@@ -7,6 +7,8 @@
 #define MAX_WORDS_IN_SENTENCE_GENERATION 20
 #define MAX_WORD_LENGTH 100
 #define MAX_SENTENCE_LENGTH 1000
+#define TRUE 1
+#define FALSE 0
 int NUM_OF_WORDS = 1;
 typedef struct WordStruct {
     char *word;
@@ -19,7 +21,7 @@ typedef struct WordStruct {
 typedef struct WordProbability {
     struct WordStruct *word_struct_ptr;
 
-    int probabilityCount;
+    int countOccurForProbability;
     double percentage;
     //... Add your own fields here
 } WordProbability;
@@ -38,15 +40,17 @@ typedef struct LinkList {
 
 void createWordStruct(char *word, WordStruct **pStruct);
 
-WordStruct *checkOccurrence(LinkList *pList, char *token);
+WordStruct *checkInLinkedList(LinkList *pList, char *token);
 
-int checkProbabilityList(WordStruct *pStruct, WordStruct *secondWord);
+int checkProbabilityList(WordStruct *firstWordStruct, WordStruct *secondWordStruct);
 
 void updatePrecentage(WordStruct *);
 
-int occurences(WordStruct *);
+int sumOccurrences(WordStruct *pStruct);
 
 void printLinkedList(LinkList *list);
+
+int countFileWords(FILE *pFile);
 
 /**
  * Add data to new node at the end of the given link list.
@@ -98,6 +102,7 @@ WordStruct *get_first_random_word(LinkList *dictionary) {
                 i = 0;
                 randomNum = get_random_number(dictionary->size);
                 temp = dictionary->first;
+                continue;
             } else {
                 return temp->data;// found
             }
@@ -115,7 +120,7 @@ WordStruct *get_first_random_word(LinkList *dictionary) {
  */
 WordStruct *get_next_random_word(WordStruct *word_struct_ptr) {
     double totalPercentage = 0;
-    double randomNum = ( rand() / (double)RAND_MAX) * 100.0; // check casting to double
+    double randomNum = (rand() / (double) RAND_MAX) * 100.0;
     int index = 0;
     for (int i = 0; i < word_struct_ptr->wordProbabilitySize; i++) {
         totalPercentage += word_struct_ptr->prob_list[i].percentage;
@@ -155,64 +160,60 @@ int generate_sentence(LinkList *dictionary) {
  * @return 0 if already in list, 1 otherwise.
  */
 int add_word_to_probability_list(WordStruct *first_word, WordStruct *second_word) {
-    if (second_word == NULL) { // first word with dot.
-        first_word->prob_list = NULL;
-        first_word->wordProbabilitySize = 0;
-        return 1;
-    }
     if (first_word->wordProbabilitySize == 0) { // first word to add
         first_word->prob_list = (WordProbability *) malloc(sizeof(WordProbability));
         if (!first_word->prob_list) {
             fprintf(stdout, "Allocation failure: couldn't allocate memory\n");
             exit(EXIT_FAILURE);
         }
-        first_word->prob_list[0].probabilityCount = 1;
+        first_word->prob_list[0].countOccurForProbability = 1;
         first_word->prob_list[0].word_struct_ptr = second_word;
         first_word->prob_list[0].percentage = 100.0;
         first_word->wordProbabilitySize = 1;
         updatePrecentage(first_word);
         return 1;
     }
-    return checkProbabilityList(first_word, second_word);
+    return checkProbabilityList(first_word, second_word); // wordprobabilitysize not 0 so its not the first time we see this word
 }
 
-void updatePrecentage(WordStruct *pStruct) {
-    int totalOccurences = occurences(pStruct);
+void updatePrecentage(WordStruct *pStruct) { // update precentage of each word in the allocated prob_list
+    int totalOccurences = sumOccurrences(pStruct);
     for (int i = 0; i < pStruct->wordProbabilitySize; i++) {
-        pStruct->prob_list[i].percentage = ((double) pStruct->prob_list[i].probabilityCount / totalOccurences) * 100.0;
+        pStruct->prob_list[i].percentage = ((double) pStruct->prob_list[i].countOccurForProbability / totalOccurences) * 100.0;
     }
 }
 
-int occurences(WordStruct *pStruct) {
+int sumOccurrences(WordStruct *pStruct) {
     int sum = 0;
     for (int i = 0; i < pStruct->wordProbabilitySize; i++) {
-        sum += pStruct->prob_list[i].probabilityCount;
+        sum += pStruct->prob_list[i].countOccurForProbability;
     }
     return sum;
 }
 
-int checkProbabilityList(WordStruct *pStruct, WordStruct *secondWord) {
-    if (strchr(pStruct->word, '.') != NULL) {
+int checkProbabilityList(WordStruct *firstWordStruct, WordStruct *secondWordStruct) { // check each index in WP list if secondwordstruct is there if not realloc and add
+    if (strchr(firstWordStruct->word, '.') != NULL) {
         return 0;
     }
-    int pSize = pStruct->wordProbabilitySize;
+    int WPsize = firstWordStruct->wordProbabilitySize;
     int i = 0;
-    for (; i < pSize; i++) {
-        if (strcmp(pStruct->prob_list[i].word_struct_ptr->word, secondWord->word) == 0) {
-            pStruct->prob_list[i].probabilityCount++;
-            updatePrecentage(pStruct);
+    for (; i < WPsize; i++) { // check if secondword already in firstword WP
+        if (strcmp(firstWordStruct->prob_list[i].word_struct_ptr->word, secondWordStruct->word) == 0) {
+            firstWordStruct->prob_list[i].countOccurForProbability++;
+            updatePrecentage(firstWordStruct);
             return 0;
         }
     }
-    pStruct->prob_list = (WordProbability *) realloc(pStruct->prob_list, sizeof(WordProbability) * (i + 1));
-    if (!pStruct->prob_list) {
+    // second word is not in firstword WP so we want to realloc space
+    firstWordStruct->prob_list = (WordProbability *) realloc(firstWordStruct->prob_list, sizeof(WordProbability) * (i + 1));
+    if (!firstWordStruct->prob_list) {
         fprintf(stdout, "Allocation failure: couldn't allocate memory\n");
         exit(EXIT_FAILURE);
     }
-    pStruct->prob_list[i].word_struct_ptr = secondWord;
-    pStruct->prob_list[i].probabilityCount = 1;
-    pStruct->wordProbabilitySize++;
-    updatePrecentage(pStruct);
+    firstWordStruct->prob_list[i].word_struct_ptr = secondWordStruct;
+    firstWordStruct->prob_list[i].countOccurForProbability = 1;
+    firstWordStruct->wordProbabilitySize++;
+    updatePrecentage(firstWordStruct);
     return 1;
 }
 
@@ -228,26 +229,34 @@ int checkProbabilityList(WordStruct *pStruct, WordStruct *secondWord) {
  * @param dictionary Empty dictionary to fill
  */
 void fill_dictionary(FILE *fp, int words_to_read, LinkList *dictionary) {
+    int wordsCount = countFileWords(fp);
+    if (words_to_read == -1) {
+        words_to_read = wordsCount;
+    } else if (words_to_read > wordsCount) {
+        words_to_read = wordsCount;
+    }
     char *line = NULL;
     size_t lineSize = 0;
-    size_t nread;
     WordStruct *curr = NULL;
     WordStruct *prev = NULL;
     char *token;
     char temp[MAX_WORD_LENGTH + 1];
-    while ((int) (nread = getline(&line, &lineSize, fp)) != -1) {
-        int endOfLine = 0;
+    while (getline(&line, &lineSize, fp) != -1) {
+        int endOfLine = FALSE;
         token = strtok(line, " ");
         WordStruct *wordStruct = NULL;
         while (token != NULL && NUM_OF_WORDS < words_to_read) {
             strcpy(temp, token);
             if (temp[strlen(temp) - 1] == '\n') {
-                endOfLine = 1;
+                endOfLine = TRUE;
                 temp[strlen(temp) - 1] = '\0';
             }
-            if ((wordStruct = checkOccurrence(dictionary, temp)) == NULL) { // didnt found match in linked list
-                createWordStruct(temp, &wordStruct);
-                add(dictionary, wordStruct);
+            if ((wordStruct = checkInLinkedList(dictionary, temp)) == NULL) { // check if WS already in linked list
+                createWordStruct(temp, &wordStruct); // didnt found match so create word
+                if (add(dictionary, wordStruct) == 1) {
+                    fprintf(stdout, "Allocation failure: couldn't allocate memory\n");
+                    exit(EXIT_FAILURE);
+                }
             }
             prev = wordStruct;
             token = strtok(NULL, " ");
@@ -256,26 +265,26 @@ void fill_dictionary(FILE *fp, int words_to_read, LinkList *dictionary) {
                 strcpy(temp, token);
                 WordStruct *newWS = NULL;
                 if (temp[strlen(temp) - 1] == '\n') {
-                    endOfLine = 1;
+                    endOfLine = TRUE;
                     temp[strlen(temp) - 1] = '\0';
                 }
-                if ((newWS = checkOccurrence(dictionary, temp)) == NULL) { // didnt found match
-                    createWordStruct(temp, &newWS);
-                    add(dictionary, newWS);
+                if ((newWS = checkInLinkedList(dictionary, temp)) == NULL) {
+                    createWordStruct(temp, &newWS); // didnt found match so create word
+                    if (add(dictionary, newWS) == 1) {
+                        fprintf(stdout, "Allocation failure: couldn't allocate memory\n");
+                        exit(EXIT_FAILURE);
+                    }
                 }
                 curr = newWS;
                 add_word_to_probability_list(prev, curr);
-                if (strchr(temp, '.') != NULL) {
-                    prev = curr;
-                    add_word_to_probability_list(prev, NULL);
-                    if (endOfLine == 0) {
+                if (strchr(temp, '.') != NULL) { // found end of line
+                    if (endOfLine == FALSE) { // so we didnt finish to read the line and need to keep reading the words from file
                         token = strtok(NULL, " ");
-                    } else {
+                    } else { // token = NULL to end the while loop.
                         token = NULL;
                     }
                     break;
                 }
-                // stopped here
                 prev = curr;
                 token = strtok(NULL, " ");
             }
@@ -328,11 +337,10 @@ void free_dictionary(LinkList *dictionary) {
  */
 int countFileWords(FILE *file) {
     size_t lineSize = 0;
-    size_t nread;
     int words = 0;
     char *line = NULL;
     char *token = NULL;
-    while ((int) (nread = getline(&line, &lineSize, file)) != -1) {
+    while (getline(&line, &lineSize, file) != -1) {
         token = strtok(line, " ");
         while (token != NULL) {
             words++;
@@ -343,10 +351,11 @@ int countFileWords(FILE *file) {
     }
     free(line);
     line = NULL;
+    rewind(file);
     return words;
 }
 
-WordStruct *checkOccurrence(LinkList *pList, char *token) { // check if the given word is in the link list already return -1 if false and 1 if true
+WordStruct *checkInLinkedList(LinkList *pList, char *token) { // check if the given word is in the link list already return NULL if false and the wordStruct if true.
     if (pList->first == NULL) {
         return NULL;
     }
@@ -386,8 +395,9 @@ void createWordStruct(char *word, WordStruct **pStruct) {
 }
 
 int main(int argc, char *argv[]) {
-    if (argc < 4) { // not enough arguments
-        printf("Usage: Please enter parameters as followed: \n1) Seed\n"
+    if (argc < 4 || argc > 5) { // not enough arguments
+        printf("Usage: Please enter parameters as followed: \n"
+               "1) Seed\n"
                "2) Number of sentences to generate\n"
                "3) Path to file\n"
                "4) Optional - Number of words to read\n");
@@ -403,16 +413,8 @@ int main(int argc, char *argv[]) {
     }
     int wordsToRead = -1;
     if (argc == 5) {
-        int wordsCount = countFileWords(tweetsFile);
-        if (strtol(argv[4], &p, 10) > wordsCount) {
-            wordsToRead = wordsCount;
-        } else if (strtol(argv[4], &p, 10) == -1) {
-            wordsToRead = wordsCount;
-        } else {
-            wordsToRead = strtol(argv[4], &p, 10);
-        }
+        wordsToRead = strtol(argv[4], &p, 10);
     }
-    rewind(tweetsFile);
     LinkList *linkList = (LinkList *) malloc(sizeof(LinkList));
     if (!linkList) {
         fprintf(stdout, "Allocation failure: couldn't allocate memory\n");
@@ -421,75 +423,16 @@ int main(int argc, char *argv[]) {
     linkList->first = NULL;
     linkList->size = 0;
     fill_dictionary(tweetsFile, wordsToRead, linkList);
-    rewind(tweetsFile);
-    printf("size of linked list: %d\n", linkList->size);
     int numOfTweets = strtol(argv[2], &p, 10) + 1;
-    printf("Num of words MAIN: %d\n", NUM_OF_WORDS);
     for (int i = 1; i < numOfTweets; i++) {
         printf("Tweet %d: ", i);
         generate_sentence(linkList);
     }
-    printLinkedList(linkList);
     free_dictionary(linkList);
-    fclose(tweetsFile);
-
-    return 0;
-//    FILE *fp = fopen(argv[1], "r");
-//    char *line = NULL;
-//    ssize_t lineSize = 0;
-//    size_t nread;
-//    char *space = " ";
-//    char *curr;
-//    char *prev;
-//    int counter = 0;
-//    while (getline(&line, &lineSize, fp) != -1) {
-//        char *token;
-//        token = strtok(line, space);
-//        prev = token;
-////        printf("%s\n", prev);
-//        counter++;
-//        while (token != NULL) {
-//            token = strtok(NULL, space);
-//            // second word.
-//            while (token != NULL) {
-//                counter++;
-//                curr = token;
-//                printf("prev is: |%s| current is : |%s|\n", prev, curr);
-//                if (strchr(token, '.') != NULL) {//
-//                    prev = curr;
-//                    curr = NULL;
-////                    printf("prev is: |%s| current is : |%s|\n", prev, curr);
-//                    break;
-//                }
-//                prev = curr;
-////            wordStruct->prob_list->word_struct_ptr;
-//                token = strtok(NULL, space);
-//
-//            }
-//            free(line);
-//            line = NULL;
-//        }
-//
-//    }
-//    printf("total words : %d\n", counter);
-//    return 0;
-//
-
-}
-
-void printLinkedList(LinkList *list) {
-    int i = 0;
-    double sum  = 0;
-    Node *tempNode = list->first;
-    while (tempNode != NULL) {
-        printf("%d : %s : occur: %d\n", i, tempNode->data->word, tempNode->data->numOfOccur);
-        for (int j = 0; j < tempNode->data->wordProbabilitySize; j++) {
-            printf("word: %s percentage : %f\n",tempNode->data->prob_list[j].word_struct_ptr->word,tempNode->data->prob_list[j].percentage);
-            sum += tempNode->data->prob_list[j].percentage;
-        }
-        printf("this is precentage : %f\n",sum);
-        sum = 0;
-        i++;
-        tempNode = tempNode->next;
+    if (fclose(tweetsFile) != 0) {
+        printf("Error: Cant close file");
+        exit(EXIT_FAILURE);
     }
+    return 0;
+
 }
