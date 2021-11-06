@@ -179,7 +179,7 @@ int add_word_to_probability_list(WordStruct *first_word, WordStruct *second_word
 void updatePrecentage(WordStruct *pStruct) { // update precentage of each word in the allocated prob_list
     int totalOccurences = sumOccurrences(pStruct);
     for (int i = 0; i < pStruct->wordProbabilitySize; i++) {
-        pStruct->prob_list[i].percentage = ((double) pStruct->prob_list[i].countOccurForProbability / totalOccurences) * 100.0;
+        pStruct->prob_list[i].percentage = ((double) pStruct->prob_list[i].countOccurForProbability / totalOccurences) * 100.0; // calculate percentage for each problist[i]
     }
 }
 
@@ -294,8 +294,6 @@ void fill_dictionary(FILE *fp, int words_to_read, LinkList *dictionary) {
     }
     free(line);
     line = NULL;
-
-
 }
 
 
